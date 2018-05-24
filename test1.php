@@ -3,21 +3,16 @@
 
 require_once('phpQuery-onefile.php');
 
-// Line botの設定
-$accessToken = 'アクセストークン'
-
-$jsonString = file_get_contents('php://input');
-error_log($jsonString);
-$jsonObj = json_decode($jsonString);
-
-$message = $jsonObj->{"events"}[0]->{"message"};
-$replyToken = $jsonObj->{"events"}[0]->{"replyToken"};
-
-$accept_message = trim($message->text);
 
 // スクレイピング
 $html = file_get_contents('https://nomalog.herokuapp.com/');
 $doc  = phpQuery::newDocument($html);
+
+
+$message->text = PHP_EOL;
+
+$accept_message = trim($message->text);
+
 
 $areas = [];
 
@@ -27,19 +22,27 @@ for ($i = 0; $i < 34; ++$i) {
     $areas[] = $doc->find("#left_contents")->find(".select__contents__list:eq($i)")->find("a")->text();
  }
 
-// 配列$areasで使えるindexを作成
+// 配列$areasで使うindexを作成
 $index = $num = 0;
+
+
+// $message->text = '銀座';
+var_dump($message->text);
 
 // 本番用
 foreach($areas as $key => $area) {
-    // 送信された地名がある配列$areasのkey番号を取得
-    if (mb_strpos($area, $accept_message) !== false) {
+    // var_dump($area);
+    if (mb_strpos($area, $message->text) !== false) {
+        // 送信された地名がある配列$areasのkey番号を取得
         $num = $index + 1;
         break;
     }
 
     ++$index;
 }
+
+var_dump($index);
+var_dump($num);
 
 // 送られてきたメッセージの中身からレスポンスのタイプを選択
 if (is_numeric($index) && $message->text !== '・' && $num !== 0) {
@@ -54,17 +57,24 @@ if (is_numeric($index) && $message->text !== '・' && $num !== 0) {
 
     // カフェの店舗数を数える。カフェの投稿がないか、１０店舗より多ければループを抜ける
     $cafe_len = 0;
+
+
     while ($cafe_list->find("a:eq($cafe_len)")->attr("href") && $cafe_len < 10) {
         ++$cafe_len;
     }
+
+
+    var_dump('$cafe_len:');var_dump($cafe_len);
 
     // そのエリアにカフェの投稿がない場合
     if ($cafe_len === 0) {
 
         $messageData = [
             'type' => 'text',
-            'text' => 'そのエリアにはまだ投稿がありません😅'
+            'text' => 'ごめんなさい！まだその場所には投稿がありません😅'
         ];
+
+        var_dump($messageData);
 
     } else {
 
@@ -115,36 +125,16 @@ if (is_numeric($index) && $message->text !== '・' && $num !== 0) {
             ]
         ];
     }
+        var_dump($messageData);
+
 } else {
 
     // 該当するエリアがない場合
     $messageData = [
         'type' => 'text',
-        'text' => 'Nomalogに記載の地名を入力してください😅'
+        'text' => 'ごめんなさい！Nomalogに記載の地名を入力してください😅'
     ];
+        var_dump($messageData);
+
 }
 
-error_log($messageData[0]);
-
-error_log($carousel_columns['actions']['0']['uri']);
-
-$response = [
-    'replyToken' => $replyToken,
-    'messages' => [$messageData]
-];
-
-error_log(json_encode($response));
-
-$ch = curl_init('https://api.line.me/v2/bot/message/reply');
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($response));
-curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-    'Content-Type: application/json; charser=UTF-8',
-    'Authorization: Bearer ' . $accessToken
-));
-
-$result = curl_exec($ch);
-error_log($result);
-curl_close($ch);
