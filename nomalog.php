@@ -1,19 +1,32 @@
 <?php
-// header('Content-Type: text/html; charset=UTF-8');
 
 require_once('phpQuery-onefile.php');
 
 // Line botの設定
-$accessToken = 'アクセストークン'
+$accessToken = 'アクセストークン';
 
+// Jsonの受け取り
 $jsonString = file_get_contents('php://input');
 error_log($jsonString);
 $jsonObj = json_decode($jsonString);
 
-$message = $jsonObj->{"events"}[0]->{"message"};
+// メッセージイベントのメッセージを取り出す
+$message = $jsonObj->{"events"}[0]->{"message"}->text;
+
+if(!isset($message) && empty($message)) {
+    return;
+}
+
+$accept_message = trim($message);
+
+// 一時的に発行されるリプライトークンを取得
 $replyToken = $jsonObj->{"events"}[0]->{"replyToken"};
 
-$accept_message = trim($message->text);
+// メッセージのログを取る
+$file = 'debug.txt';
+$body = file_get_contents($file);
+$body = $body . "\n" . $accept_message;
+file_put_contents($file, $body);
 
 // スクレイピング
 $html = file_get_contents('https://nomalog.herokuapp.com/');
@@ -23,7 +36,7 @@ $areas = [];
 
 // 全てのエリアを取得
 for ($i = 0; $i < 34; ++$i) {
-    // 変数$iが使用されているので、""を使う
+    // 変数$iが使用されているので、''ではなく""を使う
     $areas[] = $doc->find("#left_contents")->find(".select__contents__list:eq($i)")->find("a")->text();
  }
 
@@ -41,9 +54,22 @@ foreach($areas as $key => $area) {
     ++$index;
 }
 
-// 送られてきたメッセージの中身からレスポンスのタイプを選択
-if (is_numeric($index) && $message->text !== '・' && $num !== 0) {
+if(mb_strpos('一覧', $accept_message) !== false || mb_strpos('エリア', $accept_message) !== false) {
 
+    $area_list = "";
+
+    foreach ($areas as $key => $area) {
+        $area_list .= $area . "\n";
+    }
+
+    $messageData = [
+        'type' => 'text',
+        'text' => $area_list
+    ];
+
+} else if (is_numeric($index) && $accept_message !== '・' && $num !== 0) {
+
+    //送られてきたメッセージの中身からレスポンスのタイプを選択
     $area_html = file_get_contents('https://nomalog.herokuapp.com/area' . $num);
     $area_doc = phpQuery::newDocument($area_html);
 
@@ -63,7 +89,8 @@ if (is_numeric($index) && $message->text !== '・' && $num !== 0) {
 
         $messageData = [
             'type' => 'text',
-            'text' => 'そのエリアにはまだ投稿がありません😅'
+            'text' => 'そのエリアにはまだ投稿がありません😣' . "\n"
+                         . '「渋谷・恵比寿・代官山」や「六本木・麻布・広尾」に投稿があります'
         ];
 
     } else {
@@ -89,7 +116,7 @@ if (is_numeric($index) && $message->text !== '・' && $num !== 0) {
             $carousel_columns[] = 
                 [
                     'thumbnailImageUrl' => $images[$i],
-                    'title'   => $names[$i] . ' (' . $stars[$i] . ')',
+                    'title'   => $names[$i] . ' (🌟' . $stars[$i] . ')',
                     'text'    => $areas[$index],
                     'actions' => [
                         [
@@ -108,7 +135,7 @@ if (is_numeric($index) && $message->text !== '・' && $num !== 0) {
         // カルーセルタイプ
         $messageData = [
             'type' => 'template',
-            'altText' => 'カルーセル',
+            'altText' => 'カフェ情報一覧',
             'template' => [
                 'type' => 'carousel',
                 'columns' => $carousel_columns
@@ -120,7 +147,8 @@ if (is_numeric($index) && $message->text !== '・' && $num !== 0) {
     // 該当するエリアがない場合
     $messageData = [
         'type' => 'text',
-        'text' => 'Nomalogに記載の地名を入力してください😅'
+        'text' => '渋谷・恵比寿・六本木などNomalogに記載の地名を入力してください😅' . "\n"
+                     . 'https://nomalog.herokuapp.com'
     ];
 }
 

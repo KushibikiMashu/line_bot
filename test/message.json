@@ -1,0 +1,18 @@
+{
+  "events": [
+    {
+      "replyToken": "0000",
+      "type": "message",
+      "timestamp": 000,
+      "source": {
+        "type": "user",
+        "userId": "U4af4980..."
+      },
+      "message": {
+        "id": "325000",
+        "type": "text",
+        "text": "渋谷"
+      }
+    }
+  ]
+}
